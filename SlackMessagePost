@@ -1,0 +1,67 @@
+(function executeRule(current, previous /*null when async*/) {
+	// get slack table
+	var slackRecord = new GlideRecord('u_slack_commands');
+	slackRecord.orderByDesc('sys_created_on');
+	slackRecord.setLimit(1);
+	slackRecord.query();
+	while(slackRecord.next()){
+		 short_desc = slackRecord.getValue('u_text');
+		 callerID = slackRecord.getValue('u_user_name');
+		 slackCMD = slackRecord.getValue('u_command');
+	}
+	// Creates ticket in respective table based on command used.
+	switch(slackCMD){
+		case '/snow' :
+			createGlideRecord('incident');
+			break;
+		case '/itstore':
+			createGlideRecord('sc_req_item');
+			break;
+	}
+	// Add your code here
+	tix_sys_id = 'https://dev36728.service-now.com/sp?sys_id='+tix.sys_id+'&view=sp&id=ticket&table=incident';
+	var slack = new SlackMessage();
+		slack.payload.channel = "@"+callerID;
+		slack.payload.attachments.push({
+			'title': "Ticket Submitted: " + tix.number.toString(),
+			'title_link' : tix_sys_id, // Title's hyperlink URL
+			'color': '#58D68D',
+			'text' : "Your request has been received and will be worked on accordingly.",
+			'fields' : [{
+			"title" : "Short Description",
+			"value" : "_"+tix.short_description.getDisplayValue()+"_",
+		}],
+		"actions": [{
+		"name" : "detail",
+		"type" : "button",
+		"text" : "More Detail",
+		"url" : tix_sys_id, // Button's hyperlink URL
+		"style" : "primary",
+		}]
+	});
+	slack.send();
+
+	function createGlideRecord(tableName){
+	tix = new GlideRecord(tableName);
+	tix.insert();
+	tix.orderByDesc('sys_created_on');
+	tix.setLimit(1);
+	tix.query();
+		while (tix.next()){
+			tix.setValue('short_description', short_desc);
+			if (short_desc.includes('urgent')){
+				tix.u_escalated_req = true; // Escalated Box is checked if the word 'urgent' is in short description
+			}
+			//tix.category = 'Hardware';
+			tix.caller_id = callerID;
+			tix.update();
+		}
+	}
+	// Show error message if it failed
+// 	if(response.getStatusCode() != 200) {
+// 		gs.addInfoMessage("response.getBody: " + response.getBody());
+// 		gs.addInfoMessage("response.getStatusCode: " + response.getStatusCode());
+// 		gs.addInfoMessage("response.getErrorMessage: " + response.getErrorMessage());
+// 	}
+
+})(current, previous);
